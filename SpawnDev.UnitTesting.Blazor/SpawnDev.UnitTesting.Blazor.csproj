@@ -1,0 +1,38 @@
+<Project Sdk="Microsoft.NET.Sdk.Razor">
+
+	<PropertyGroup>
+		<TargetFrameworks>net8.0;net10.0</TargetFrameworks>
+		<Nullable>enable</Nullable>
+		<ImplicitUsings>enable</ImplicitUsings>
+		<Version>1.0.0</Version>
+		<GeneratePackageOnBuild>True</GeneratePackageOnBuild>
+		<GenerateDocumentationFile>true</GenerateDocumentationFile>
+		<EmbedAllSources>true</EmbedAllSources>
+		<DebugType>Embedded</DebugType>
+		<Title>SpawnDev.UnitTesting.Blazor</Title>
+		<Authors>LostBeard</Authors>
+		<Description>Blazor UI components for SpawnDev.UnitTesting</Description>
+		<PackageProjectUrl>https://github.com/LostBeard/SpawnDev.UnitTesting</PackageProjectUrl>
+		<PackageReadmeFile>README.md</PackageReadmeFile>
+		<PackageLicenseFile>LICENSE.txt</PackageLicenseFile>
+		<RepositoryUrl>https://github.com/LostBeard/SpawnDev.UnitTesting.git</RepositoryUrl>
+		<RepositoryType>git</RepositoryType>
+		<PackageTags>Blazor;DotNet;UnitTesting;Testing</PackageTags>
+		<LangVersion>latest</LangVersion>
+	</PropertyGroup>
+
+	<ItemGroup>
+		<None Include="..\README.md" Pack="true" PackagePath="\" />
+		<None Include="..\LICENSE.txt" Pack="true" PackagePath="\" />
+	</ItemGroup>
+
+	<ItemGroup>
+		<ProjectReference Include="..\SpawnDev.UnitTesting\SpawnDev.UnitTesting.csproj" />
+		<PackageReference Include="SpawnDev.BlazorJS" Version="2.65.0" />
+	</ItemGroup>
+
+	<ItemGroup>
+		<SupportedPlatform Include="browser" />
+	</ItemGroup>
+
+</Project>

@@ -1,0 +1,4 @@
+<Solution>
+  <Project Path="SpawnDev.UnitTesting.Blazor/SpawnDev.UnitTesting.Blazor.csproj" />
+  <Project Path="SpawnDev.UnitTesting/SpawnDev.UnitTesting.csproj" />
+</Solution>

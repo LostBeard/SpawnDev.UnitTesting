@@ -1,0 +1,126 @@
+@using SpawnDev.UnitTesting
+
+<div>
+    <div style="padding: 2px 6px 2px 6px;">
+        <button onclick="@(() => unitTestService.RunTests())" disabled="@(unitTestService.State == TestState.Running)">Run Tests</button>
+        <button onclick="@(() => unitTestService.CancelTests())" disabled="@(unitTestService.State != TestState.Running)">Cancel Tests</button>
+    </div>
+    @{
+        var tests = unitTestService.Tests;
+        var totalCount = tests.Count;
+        var completedTests = tests.Where(t => t.State == TestState.Done).ToList();
+        var passedCount = completedTests.Count(t => t.Result == TestResult.Success);
+        var failedCount = completedTests.Count(t => t.Result == TestResult.Error);
+        var skippedCount = completedTests.Count(t => t.Result == TestResult.Unsupported);
+        var pendingCount = totalCount - completedTests.Count;
+        var totalDuration = completedTests.Sum(t => t.Duration);
+        var summaryColor = failedCount > 0 ? "#d32f2f" : (completedTests.Count == totalCount && totalCount > 0 ? "#2e7d32" : "#555");
+    }
+    <div id="test-summary" style="padding: 6px 8px; margin: 4px 6px; font-family: monospace; font-size: 14px; background: #f5f5f5; border: 1px solid #ddd; border-radius: 4px; display: flex; gap: 16px; align-items: center; flex-wrap: wrap;">
+        <span style="font-weight: bold; color: @summaryColor;">
+            @if (unitTestService.State == TestState.Running)
+            {
+                <span>⏳ Running...</span>
+            }
+            else if (unitTestService.State == TestState.Done)
+            {
+                <span>@(failedCount == 0 ? "✅" : "❌") Done</span>
+            }
+            else
+            {
+                <span>⏸ Ready</span>
+            }
+        </span>
+        <span>📊 <strong>@totalCount</strong> tests</span>
+        @if (completedTests.Count > 0)
+        {
+            <span style="color: #2e7d32;">✅ @passedCount passed</span>
+            <span style="color: #d32f2f;">❌ @failedCount failed</span>
+            <span style="color: #e65100;">⏭ @skippedCount skipped</span>
+            if (pendingCount > 0)
+            {
+                <span style="color: #777;">⏳ @pendingCount pending</span>
+            }
+            <span style="color: #555;">⏱ @(totalDuration)ms</span>
+        }
+    </div>
+    <div>
+        @{
+            var readyClass = Rendered ? "unit-test-ready" : "";
+        }
+        <table class="unit-test-view @readyClass">
+            <thead>
+                <tr>
+                    <th></th>
+                    <th>#</th>
+                    <th>Test Type</th>
+                    <th>Method</th>
+                    <th>Duration</th>
+                    <th>Result</th>
+                </tr>
+            </thead>
+            <tbody>
+                @for (var i = 0; i < unitTestService.Tests.Count; i++)
+                {
+                    var test = unitTestService.Tests[i];
+                    var stateClass = test.State switch
+                    {
+                        TestState.Done => "test-state-done",
+                        TestState.Running => "test-state-running",
+                        _ => "test-state-none",
+                    };
+                    var resultClass = test.Result switch
+                    {
+                        TestResult.Unsupported => "test-unsupported",
+                        TestResult.Success => "test-success",
+                        TestResult.Error => "test-error",
+                        _ => "",
+                    };
+                    <tr style="padding: 2px;" class="@stateClass @resultClass">
+                        <td>
+                            <button onclick="@(() => unitTestService.RunTest(test))" disabled="@(unitTestService.State == TestState.Running || test.State == TestState.Running)">Run</button>
+                        </td>
+                        <td class="test-type-name" style="padding: 2px 6px 2px 6px;">
+                            <span style="font-weight: bold;">@(i + 1)</span>
+                        </td>
+                        <td class="test-type-name" style="padding: 2px 6px 2px 6px;">
+                            <span style="font-weight: bold;">@(test.TestTypeName)</span>
+                        </td>
+                        <td class="test-method-name" style="padding: 2px 6px 2px 6px;">
+                            <span style="font-weight: bold;">@(test.TestMethodName)</span>
+                        </td>
+                        <td class="test-duration" style="padding: 2px 6px 2px 6px;">
+                            <span style="">@(test.State == TestState.Done ? $"{test.Duration} ms" : "-")</span>
+                        </td>
+                        <td class="test-state" style="padding: 2px 6px 2px 6px;">
+                            @switch (test.State)
+                            {
+                                case TestState.None:
+                                    <span>-</span>
+                                    break;
+                                case TestState.Running:
+                                    <span style="font-weight: bold; color: blue;">running</span>
+                                    break;
+                                case TestState.Done:
+                                    switch (test.Result)
+                                    {
+                                        case TestResult.Unsupported:
+                                            <span style="color: orange;">Skipped: @test.ResultText</span>
+                                            break;
+                                        case TestResult.Success:
+                                            <span style="color: green;">@test.ResultText</span>
+                                            break;
+                                        case TestResult.Error:
+                                            <span style="color: red;">@test.Error</span>
+                                            break;
+                                    }
+                                    break;
+                            }
+                        </td>
+                    </tr>
+                }
+
+            </tbody>
+        </table>
+    </div>
+</div>
