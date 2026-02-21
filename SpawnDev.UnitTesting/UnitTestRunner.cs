@@ -110,6 +110,7 @@ namespace SpawnDev.UnitTesting
         /// </summary>
         public void ResetTests()
         {
+            DisposeInstances();
             Tests.ForEach(o => o.Reset());
             State = TestState.None;
         }
@@ -126,6 +127,19 @@ namespace SpawnDev.UnitTesting
         }
 
         private readonly Dictionary<Type, object> _instances = new Dictionary<Type, object>();
+
+        /// <summary>
+        /// Disposes all cached test class instances that implement IDisposable.
+        /// This releases cached resources like GPU contexts/accelerators.
+        /// </summary>
+        private void DisposeInstances()
+        {
+            foreach (var instance in _instances.Values)
+            {
+                (instance as IDisposable)?.Dispose();
+            }
+            _instances.Clear();
+        }
 
         private object? GetTestTypeInstance(Type testType)
         {
@@ -244,6 +258,8 @@ namespace SpawnDev.UnitTesting
                 await RunTest(test);
             }
             _cancellationTokenSource = null;
+            // Dispose cached test instances to release GPU resources
+            DisposeInstances();
             State = TestState.Done;
             FireStateChangeEvent();
             LogResults();
