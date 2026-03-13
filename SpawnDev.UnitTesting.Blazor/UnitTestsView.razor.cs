@@ -72,7 +72,7 @@ namespace SpawnDev.UnitTesting.Blazor
             if (!_beenInit)
             {
                 _beenInit = true;
-                unitTestService = new UnitTestRunner();
+                unitTestService = new UnitTestRunner(false);
                 unitTestService.OnUnitTestResolverEvent += UnitTestService_OnUnitTestResolverEvent;
                 unitTestService.TestStatusChanged += UnitTestSet_TestStatusChanged;
                 LoadFromParams();

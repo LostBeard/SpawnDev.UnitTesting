@@ -1,4 +1,5 @@
 using System.Reflection;
+using System.Text.Json.Serialization;
 
 namespace SpawnDev.UnitTesting
 {
@@ -8,21 +9,27 @@ namespace SpawnDev.UnitTesting
     public class UnitTest
     {
         /// <summary>
-        /// The test class name
-        /// </summary>
-        public string TestTypeName { get; }
-        /// <summary>
         /// The test class type
         /// </summary>
-        public Type TestType { get; }
-        /// <summary>
-        /// The test method name
-        /// </summary>
-        public string TestMethodName { get; }
+        [JsonIgnore]
+        public Type? TestType { get; }
         /// <summary>
         /// The test method info
         /// </summary>
-        public MethodInfo TestMethod { get; }
+        [JsonIgnore]
+        public MethodInfo? TestMethod { get; }
+        /// <summary>
+        /// The test name
+        /// </summary>
+        public string TestName => $"{TestTypeName}.{TestMethodName}";
+        /// <summary>
+        /// The test class name
+        /// </summary>
+        public string TestTypeName { get; set; }
+        /// <summary>
+        /// The test method name
+        /// </summary>
+        public string TestMethodName { get; set; }
         /// <summary>
         /// Result text (success message or unsupported reason)
         /// </summary>
@@ -57,6 +64,7 @@ namespace SpawnDev.UnitTesting
             TestMethod = methodInfo;
             TestMethodName = TestMethod.Name;
         }
+        public UnitTest() { }
         /// <summary>
         /// Resets the test to its initial state
         /// </summary>

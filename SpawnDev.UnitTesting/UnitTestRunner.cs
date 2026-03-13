@@ -1,3 +1,4 @@
+using Microsoft.Extensions.DependencyInjection;
 using System.Diagnostics;
 using System.Reflection;
 
@@ -9,6 +10,74 @@ namespace SpawnDev.UnitTesting
     /// </summary>
     public class UnitTestRunner
     {
+        IServiceProvider? _serviceProvider;
+        /// <summary>
+        /// Initializes a new instance of the UnitTestRunner class with default settings. Use SetTestTypes or SetTestAssemblies to discover tests before running.
+        /// </summary>
+        public UnitTestRunner()
+        {
+            FindAllTests();
+        }
+        /// <summary>
+        /// Initializes a new instance of the UnitTestRunner class. If findAll is true, discovers all tests in the current assembly and its references.
+        /// </summary>
+        public UnitTestRunner(bool findAll)
+        {
+            if (findAll) FindAllTests();
+        }
+        /// <summary>
+        /// Initializes a new instance of the UnitTestRunner class using the specified service provider to resolve
+        /// dependencies.
+        /// </summary>
+        /// <param name="serviceProvider">The service provider used to obtain required services and dependencies for the UnitTestRunner instance.
+        /// Cannot be null.</param>
+        public UnitTestRunner(IServiceProvider serviceProvider)
+        {
+            _serviceProvider = serviceProvider;
+            FindAllTests();
+        }
+        /// <summary>
+        /// Initializes a new instance of the UnitTestRunner class using the specified service provider, and optionally
+        /// discovers all available tests.
+        /// </summary>
+        /// <remarks>Set findAll to true to automatically discover and load all tests when the
+        /// UnitTestRunner is created. This can be useful for scenarios where immediate test discovery is
+        /// required.</remarks>
+        /// <param name="serviceProvider">The service provider used to resolve dependencies required by the UnitTestRunner.</param>
+        /// <param name="findAll">true to discover and load all available tests during initialization; otherwise, false.</param>
+        public UnitTestRunner(IServiceProvider serviceProvider, bool findAll)
+        {
+            _serviceProvider = serviceProvider;
+            if (findAll) FindAllTests();
+        }
+
+        /// <summary>
+        /// Finds all tests in the running assembly and its referenced assemblies. This is a convenience method that calls SetTestAssemblies with the current assembly and its references.
+        /// </summary>
+        public void FindAllTests()
+        {
+            // get a list of assemblies to scan: the current assembly and all referenced assemblies
+            Assembly[] loadedAssemblies = AppDomain.CurrentDomain.GetAssemblies();
+
+            //foreach (var assembly in loadedAssemblies)
+            //{
+            //    Console.WriteLine($"{assembly.GetName().Name} - {assembly.Location}");
+            //}
+            //var currentAssembly = Assembly.GetExecutingAssembly();
+            //var referencedAssemblies = currentAssembly.GetReferencedAssemblies()
+            //    .Select(Assembly.Load)
+            //    .ToList();
+            //referencedAssemblies.Add(currentAssembly);
+            SetTestAssemblies(loadedAssemblies);
+        }
+        /// <summary>
+        /// Delegate for resolving test type instances
+        /// </summary>
+        public delegate void UnitTestResolverEventDelegate(UnitTestResolverEvent resolverEvent);
+        /// <summary>
+        /// Event for custom test type instance resolution (e.g. DI)
+        /// </summary>
+        public event UnitTestResolverEventDelegate? OnUnitTestResolverEvent;
         /// <summary>
         /// Fired when test status changes (for UI updates)
         /// </summary>
@@ -37,6 +106,10 @@ namespace SpawnDev.UnitTesting
         /// </summary>
         public void SetTestTypes(IEnumerable<Type> unitTestTypes)
         {
+            if (unitTestTypes.Count() == 0)
+            {
+                return;
+            }
             if (State == TestState.Running)
             {
                 throw new Exception("Unit test types cannot be set while tests are running");
@@ -97,15 +170,6 @@ namespace SpawnDev.UnitTesting
         }
 
         /// <summary>
-        /// Delegate for resolving test type instances
-        /// </summary>
-        public delegate void UnitTestResolverEventDelegate(UnitTestResolverEvent resolverEvent);
-        /// <summary>
-        /// Event for custom test type instance resolution (e.g. DI)
-        /// </summary>
-        public event UnitTestResolverEventDelegate? OnUnitTestResolverEvent;
-
-        /// <summary>
         /// Resets all tests to initial state
         /// </summary>
         public void ResetTests()
@@ -147,7 +211,41 @@ namespace SpawnDev.UnitTesting
             object? ret = null;
             var ev = new UnitTestResolverEvent(testType);
             OnUnitTestResolverEvent?.Invoke(ev);
-            ret = ev.TypeInstance ?? Activator.CreateInstance(testType);
+            ret = ev.TypeInstance;
+            // check if the test type is a service
+            if (ret == null && _serviceProvider != null)
+            {
+                try
+                {
+                    ret = _serviceProvider.GetService(testType);
+                }
+                catch { }
+
+            }
+            if (ret == null)
+            {
+                // if not, try to create an instance (will work if it has a parameterless constructor or if dependencies can be resolved from the service provider)
+                if (_serviceProvider != null)
+                {
+                    // the type may use services, try to create it with the service provider
+                    try
+                    {
+                        ret = ActivatorUtilities.CreateInstance(_serviceProvider, testType);
+                    }
+                    catch { }
+                }
+                else
+                {
+                    try
+                    {
+                        ret = Activator.CreateInstance(testType);
+                    }
+                    catch (Exception ex)
+                    {
+                        Console.WriteLine($"[UnitTest] Failed to create instance of {testType.FullName}: {ex.Message}");
+                    }
+                }
+            }
             if (ret != null) _instances[testType] = ret;
             return ret;
         }

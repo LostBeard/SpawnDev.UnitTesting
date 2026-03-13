@@ -76,11 +76,12 @@
                         TestResult.Error => "test-error",
                         _ => "",
                     };
-                    <tr style="padding: 2px;" class="@stateClass @resultClass">
+                    var testClassName = $"{test.TestTypeName}-{test.TestMethodName}";
+                    <tr style="padding: 2px;" class="@stateClass @resultClass @testClassName">
                         <td>
                             <button onclick="@(() => unitTestService.RunTest(test))" disabled="@(unitTestService.State == TestState.Running || test.State == TestState.Running)">Run</button>
                         </td>
-                        <td class="test-type-name" style="padding: 2px 6px 2px 6px;">
+                        <td class="test-index" style="padding: 2px 6px 2px 6px;">
                             <span style="font-weight: bold;">@(i + 1)</span>
                         </td>
                         <td class="test-type-name" style="padding: 2px 6px 2px 6px;">
