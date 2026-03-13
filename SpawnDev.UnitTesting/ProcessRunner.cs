@@ -38,18 +38,25 @@ namespace SpawnDev.UnitTesting
             try
             {
                 using var proc = Process.Start(psi)!;
-                ret.StdOut = await proc.StandardOutput.ReadToEndAsync();
-                ret.StdErr = await proc.StandardError.ReadToEndAsync();
-                var completed = proc.WaitForExit(timeout);
-                if (!completed)
+                // Read both streams concurrently to prevent pipe buffer deadlock.
+                // Sequential reads can deadlock when the child writes >4KB to one
+                // stream while we're blocked waiting on the other.
+                var stdoutTask = proc.StandardOutput.ReadToEndAsync();
+                var stderrTask = proc.StandardError.ReadToEndAsync();
+                using var cts = new CancellationTokenSource(timeout);
+                try
+                {
+                    await proc.WaitForExitAsync(cts.Token);
+                    ret.ExitCode = proc.ExitCode;
+                }
+                catch (OperationCanceledException)
                 {
                     try { proc.Kill(entireProcessTree: true); } catch { }
                     ret.ExitCode = -1;
                 }
-                else
-                {
-                    ret.ExitCode = proc.ExitCode;
-                }
+                await Task.WhenAll(stdoutTask, stderrTask);
+                ret.StdOut = stdoutTask.Result;
+                ret.StdErr = stderrTask.Result;
             }
             catch (Exception ex)
             {
