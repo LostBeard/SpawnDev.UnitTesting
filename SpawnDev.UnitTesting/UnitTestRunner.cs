@@ -83,6 +83,18 @@ namespace SpawnDev.UnitTesting
         /// </summary>
         public event Action? TestStatusChanged;
         /// <summary>
+        /// Optional callback invoked before each test to check for and dismiss
+        /// framework-level error UI (e.g. Blazor's #blazor-error-ui).
+        /// Should return true if an error was visible and dismissed.
+        /// </summary>
+        public Func<Task<bool>>? DismissErrorUI { get; set; }
+        /// <summary>
+        /// Optional callback invoked after each test to check if framework-level
+        /// error UI appeared during the test.
+        /// Should return true if an error is currently visible.
+        /// </summary>
+        public Func<Task<bool>>? CheckErrorUI { get; set; }
+        /// <summary>
         /// Current runner state
         /// </summary>
         public TestState State { get; private set; } = TestState.None;
@@ -260,6 +272,11 @@ namespace SpawnDev.UnitTesting
             test.Reset();
             test.State = TestState.Running;
             FireStateChangeEvent();
+            // Dismiss any pre-existing error UI before the test
+            if (DismissErrorUI != null)
+            {
+                try { await DismissErrorUI(); } catch { }
+            }
             var sw = new Stopwatch();
             sw.Start();
             // Determine timeout: per-test attribute overrides default
@@ -327,6 +344,19 @@ namespace SpawnDev.UnitTesting
                 test.StackTrace = ex.StackTrace ?? "";
                 test.Error = ex.InnerException != null ? ex.InnerException.ToString() : ex.ToString();
                 test.Result = TestResult.Error;
+            }
+            // Check if framework error UI appeared during the test
+            if (test.Result == TestResult.Success && CheckErrorUI != null)
+            {
+                try
+                {
+                    if (await CheckErrorUI())
+                    {
+                        test.Result = TestResult.Error;
+                        test.Error = "Framework error UI appeared during test execution";
+                    }
+                }
+                catch { }
             }
             if (string.IsNullOrEmpty(test.ResultText)) test.ResultText = test.Result.ToString();
             test.State = TestState.Done;

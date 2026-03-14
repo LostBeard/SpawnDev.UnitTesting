@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Components;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.JSInterop;
 using System.Reflection;
 
 namespace SpawnDev.UnitTesting.Blazor
@@ -33,6 +34,9 @@ namespace SpawnDev.UnitTesting.Blazor
         [Inject]
         IServiceProvider ServiceProvider { get; set; } = default!;
 
+        [Inject]
+        IJSRuntime JS { get; set; } = default!;
+
         bool _beenInit = false;
 
         /// <inheritdoc/>
@@ -65,6 +69,26 @@ namespace SpawnDev.UnitTesting.Blazor
             unitTestService.SetTestTypes(types.Distinct());
         }
 
+        /// <summary>
+        /// Dismisses the Blazor error UI if visible. Returns true if it was visible.
+        /// </summary>
+        private async Task<bool> DismissBlazorErrorUI()
+        {
+            return await JS.InvokeAsync<bool>(
+                "eval",
+                "(() => { var el = document.getElementById('blazor-error-ui'); if (el && getComputedStyle(el).display !== 'none') { el.style.display = 'none'; return true; } return false; })()");
+        }
+
+        /// <summary>
+        /// Checks if the Blazor error UI is currently visible.
+        /// </summary>
+        private async Task<bool> IsBlazorErrorUIVisible()
+        {
+            return await JS.InvokeAsync<bool>(
+                "eval",
+                "(() => { var el = document.getElementById('blazor-error-ui'); return el != null && getComputedStyle(el).display !== 'none'; })()");
+        }
+
         /// <inheritdoc/>
         protected override void OnInitialized()
         {
@@ -75,6 +99,8 @@ namespace SpawnDev.UnitTesting.Blazor
                 unitTestService = new UnitTestRunner(false);
                 unitTestService.OnUnitTestResolverEvent += UnitTestService_OnUnitTestResolverEvent;
                 unitTestService.TestStatusChanged += UnitTestSet_TestStatusChanged;
+                unitTestService.DismissErrorUI = DismissBlazorErrorUI;
+                unitTestService.CheckErrorUI = IsBlazorErrorUIVisible;
                 LoadFromParams();
             }
         }
