@@ -1,4 +1,5 @@
-﻿using System.Diagnostics;
+using System.Diagnostics;
+using System.Text;
 
 namespace SpawnDev.UnitTesting
 {
@@ -37,26 +38,51 @@ namespace SpawnDev.UnitTesting
             }
             try
             {
-                using var proc = Process.Start(psi)!;
-                // Read both streams concurrently to prevent pipe buffer deadlock.
-                // Sequential reads can deadlock when the child writes >4KB to one
-                // stream while we're blocked waiting on the other.
-                var stdoutTask = proc.StandardOutput.ReadToEndAsync();
-                var stderrTask = proc.StandardError.ReadToEndAsync();
-                using var cts = new CancellationTokenSource(timeout);
-                try
+                var outputBuilder = new StringBuilder();
+                var errorBuilder = new StringBuilder();
+                using var proc = new Process();
+                proc.StartInfo = psi;
+                proc.EnableRaisingEvents = true;
+
+                // Use event-based async reads to avoid pipe buffer deadlocks.
+                // ReadToEndAsync can deadlock when the child fills one pipe buffer
+                // while the parent is blocked waiting on the other.
+                proc.OutputDataReceived += (s, e) =>
                 {
-                    await proc.WaitForExitAsync(cts.Token);
+                    if (e.Data != null) outputBuilder.AppendLine(e.Data);
+                };
+                proc.ErrorDataReceived += (s, e) =>
+                {
+                    if (e.Data != null) errorBuilder.AppendLine(e.Data);
+                };
+
+                var exitTcs = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+                proc.Exited += (s, e) => exitTcs.TrySetResult(true);
+
+                proc.Start();
+                proc.BeginOutputReadLine();
+                proc.BeginErrorReadLine();
+
+                // Wait for exit or timeout
+                using var cts = new CancellationTokenSource(timeout);
+                using var reg = cts.Token.Register(() => exitTcs.TrySetResult(false));
+                var exited = await exitTcs.Task;
+
+                if (exited)
+                {
+                    // Process exited normally — call WaitForExit() to flush remaining buffered output
+                    proc.WaitForExit();
                     ret.ExitCode = proc.ExitCode;
                 }
-                catch (OperationCanceledException)
+                else
                 {
+                    // Timeout — kill the process
                     try { proc.Kill(entireProcessTree: true); } catch { }
                     ret.ExitCode = -1;
                 }
-                await Task.WhenAll(stdoutTask, stderrTask);
-                ret.StdOut = stdoutTask.Result;
-                ret.StdErr = stderrTask.Result;
+
+                ret.StdOut = outputBuilder.ToString();
+                ret.StdErr = errorBuilder.ToString();
             }
             catch (Exception ex)
             {
