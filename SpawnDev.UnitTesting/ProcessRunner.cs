@@ -70,8 +70,9 @@ namespace SpawnDev.UnitTesting
 
                 if (exited)
                 {
-                    // Process exited normally — call WaitForExit() to flush remaining buffered output
-                    proc.WaitForExit();
+                    // Timed wait — no-arg WaitForExit() can hang if child processes
+                    // inherited redirected stream handles and are still running.
+                    proc.WaitForExit(5000);
                     ret.ExitCode = proc.ExitCode;
                 }
                 else
