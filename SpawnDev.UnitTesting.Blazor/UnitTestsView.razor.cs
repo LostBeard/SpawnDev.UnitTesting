@@ -1,7 +1,9 @@
 using Microsoft.AspNetCore.Components;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.JSInterop;
+using SpawnDev.BlazorJS.JSObjects;
 using System.Reflection;
+using System.Text.Json;
 
 namespace SpawnDev.UnitTesting.Blazor
 {
@@ -31,6 +33,14 @@ namespace SpawnDev.UnitTesting.Blazor
         [Parameter]
         public Func<Type, object?>? TypeInstanceResolver { get; set; }
 
+        /// <summary>
+        /// Optional directory handle for writing test results to disk.
+        /// When set, writes latest.json after each test and a timestamped
+        /// summary file when the run completes. Enables tracking across runs.
+        /// </summary>
+        [Parameter]
+        public FileSystemDirectoryHandle? ResultsDirectory { get; set; }
+
         [Inject]
         IServiceProvider ServiceProvider { get; set; } = default!;
 
@@ -38,6 +48,18 @@ namespace SpawnDev.UnitTesting.Blazor
         IJSRuntime JS { get; set; } = default!;
 
         bool _beenInit = false;
+
+        // Results file writing state
+        private bool _writeInProgress;
+        private bool _writeQueued;
+        private string? _runTimestamp;
+        private int _lastWrittenCompleteCount;
+
+        private static readonly JsonSerializerOptions _jsonOptions = new()
+        {
+            WriteIndented = true,
+            PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+        };
 
         /// <inheritdoc/>
         protected override void OnParametersSet()
@@ -108,6 +130,86 @@ namespace SpawnDev.UnitTesting.Blazor
         private void UnitTestSet_TestStatusChanged()
         {
             StateHasChanged();
+            TryWriteResultsAsync();
+        }
+
+        /// <summary>
+        /// Coalescing write guard — ensures writes don't overlap on the single-threaded WASM runtime.
+        /// If a write is already in progress, queues another write for when it finishes.
+        /// </summary>
+        private async void TryWriteResultsAsync()
+        {
+            if (ResultsDirectory == null) return;
+            // Only write when new tests have completed
+            var completedCount = unitTestService.Tests.Count(t => t.State == TestState.Done);
+            var runDone = unitTestService.State == TestState.Done;
+            if (completedCount == _lastWrittenCompleteCount && !runDone) return;
+            if (_writeInProgress) { _writeQueued = true; return; }
+            _writeInProgress = true;
+            do
+            {
+                _writeQueued = false;
+                await WriteCurrentStateAsync();
+            } while (_writeQueued);
+            _writeInProgress = false;
+        }
+
+        private async Task WriteCurrentStateAsync()
+        {
+            try
+            {
+                _runTimestamp ??= DateTime.UtcNow.ToString("yyyy-MM-dd_HH-mm-ss");
+                var results = BuildResults();
+                var json = JsonSerializer.Serialize(results, _jsonOptions);
+                _lastWrittenCompleteCount = unitTestService.Tests.Count(t => t.State == TestState.Done);
+
+                // Always overwrite latest.json with current state
+                using var fh = await ResultsDirectory!.GetFileHandle("latest.json", create: true);
+                using var ws = await fh.CreateWritable();
+                await ws.Write(json);
+                await ws.Close();
+
+                // When the run is complete, also write a timestamped permanent record
+                if (unitTestService.State == TestState.Done)
+                {
+                    using var fh2 = await ResultsDirectory.GetFileHandle($"test-run-{_runTimestamp}.json", create: true);
+                    using var ws2 = await fh2.CreateWritable();
+                    await ws2.Write(json);
+                    await ws2.Close();
+                    _runTimestamp = null;
+                    _lastWrittenCompleteCount = 0;
+                }
+            }
+            catch { }
+        }
+
+        private object BuildResults()
+        {
+            var tests = unitTestService.Tests;
+            var completedTests = tests.Where(t => t.State == TestState.Done).ToList();
+            return new
+            {
+                timestamp = DateTime.UtcNow.ToString("O"),
+                runState = unitTestService.State.ToString(),
+                total = tests.Count,
+                passed = completedTests.Count(t => t.Result == TestResult.Success),
+                failed = completedTests.Count(t => t.Result == TestResult.Error),
+                skipped = completedTests.Count(t => t.Result == TestResult.Unsupported),
+                pending = tests.Count - completedTests.Count,
+                totalDurationMs = completedTests.Sum(t => t.Duration),
+                tests = tests.Select((t, i) => new
+                {
+                    index = i + 1,
+                    className = t.TestTypeName,
+                    method = t.TestMethodName,
+                    state = t.State.ToString(),
+                    result = t.Result.ToString(),
+                    durationMs = t.Duration,
+                    error = t.Result == TestResult.Error ? t.Error : null,
+                    stackTrace = t.Result == TestResult.Error && !string.IsNullOrEmpty(t.StackTrace) ? t.StackTrace : null,
+                    resultText = !string.IsNullOrEmpty(t.ResultText) ? t.ResultText : null,
+                }).ToArray()
+            };
         }
 
         /// <inheritdoc/>
