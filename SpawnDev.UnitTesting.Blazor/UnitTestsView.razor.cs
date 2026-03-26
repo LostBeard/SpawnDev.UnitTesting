@@ -34,12 +34,18 @@ namespace SpawnDev.UnitTesting.Blazor
         public Func<Type, object?>? TypeInstanceResolver { get; set; }
 
         /// <summary>
-        /// Optional directory handle for writing test results to disk.
-        /// When set, writes latest.json after each test and a timestamped
-        /// summary file when the run completes. Enables tracking across runs.
+        /// Optional root directory handle for writing live test results (latest.json).
         /// </summary>
         [Parameter]
         public FileSystemDirectoryHandle? ResultsDirectory { get; set; }
+
+        /// <summary>
+        /// Optional run-specific directory for writing results.json into a timestamped folder.
+        /// When set, results are written to both ResultsDirectory/latest.json (live)
+        /// and RunDirectory/results.json (permanent per-run record).
+        /// </summary>
+        [Parameter]
+        public FileSystemDirectoryHandle? RunDirectory { get; set; }
 
         [Inject]
         IServiceProvider ServiceProvider { get; set; } = default!;
@@ -59,6 +65,7 @@ namespace SpawnDev.UnitTesting.Blazor
         {
             WriteIndented = true,
             PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+            NumberHandling = System.Text.Json.Serialization.JsonNumberHandling.AllowNamedFloatingPointLiterals,
         };
 
         /// <inheritdoc/>
@@ -163,19 +170,27 @@ namespace SpawnDev.UnitTesting.Blazor
                 var json = JsonSerializer.Serialize(results, _jsonOptions);
                 _lastWrittenCompleteCount = unitTestService.Tests.Count(t => t.State == TestState.Done);
 
-                // Always overwrite latest.json with current state
-                using var fh = await ResultsDirectory!.GetFileHandle("latest.json", create: true);
-                using var ws = await fh.CreateWritable();
-                await ws.Write(json);
-                await ws.Close();
+                // Always overwrite latest.json at root for live monitoring
+                if (ResultsDirectory != null)
+                {
+                    using var fh = await ResultsDirectory.GetFileHandle("latest.json", create: true);
+                    using var ws = await fh.CreateWritable();
+                    await ws.Write(json);
+                    await ws.Close();
+                }
 
-                // When the run is complete, also write a timestamped permanent record
+                // Write results.json into the run folder (updated live + final)
+                if (RunDirectory != null)
+                {
+                    using var fh = await RunDirectory.GetFileHandle("results.json", create: true);
+                    using var ws = await fh.CreateWritable();
+                    await ws.Write(json);
+                    await ws.Close();
+                }
+
+                // When the run is complete, reset for next run
                 if (unitTestService.State == TestState.Done)
                 {
-                    using var fh2 = await ResultsDirectory.GetFileHandle($"test-run-{_runTimestamp}.json", create: true);
-                    using var ws2 = await fh2.CreateWritable();
-                    await ws2.Write(json);
-                    await ws2.Close();
                     _runTimestamp = null;
                     _lastWrittenCompleteCount = 0;
                 }
