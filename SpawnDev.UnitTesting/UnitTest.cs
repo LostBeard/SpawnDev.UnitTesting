@@ -43,9 +43,14 @@ namespace SpawnDev.UnitTesting
         /// </summary>
         public TestState State { get; set; } = TestState.None;
         /// <summary>
-        /// Duration in milliseconds
+        /// Duration in milliseconds. NaN/Infinity sanitized to 0 to prevent JSON serialization errors.
         /// </summary>
-        public double Duration { get; set; }
+        private double _duration;
+        public double Duration
+        {
+            get => _duration;
+            set => _duration = double.IsFinite(value) ? value : 0;
+        }
         /// <summary>
         /// Error message if the test failed
         /// </summary>
