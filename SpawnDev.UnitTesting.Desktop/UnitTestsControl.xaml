@@ -1,0 +1,60 @@
+<UserControl x:Class="SpawnDev.UnitTesting.Desktop.UnitTestsControl"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Background="#0f172a">
+    <Grid Margin="8">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <!-- Toolbar -->
+        <StackPanel Grid.Row="0" Orientation="Horizontal" Margin="0,0,0,8">
+            <Button x:Name="RunAllBtn" Content="Run All" Click="RunAll_Click" Padding="12,4"
+                    Background="#10b981" Foreground="White" FontWeight="Bold" BorderThickness="0" Cursor="Hand" FontSize="13"/>
+            <Button Content="Cancel" Click="Cancel_Click" Padding="12,4" Margin="4,0"
+                    Background="#1e293b" Foreground="#94a3b8" BorderThickness="0" Cursor="Hand" FontSize="13"/>
+            <TextBlock x:Name="StatusText" Foreground="#94a3b8" VerticalAlignment="Center" Margin="12,0" FontSize="13"/>
+        </StackPanel>
+
+        <!-- Test List -->
+        <ListView x:Name="TestList" Grid.Row="1" Background="Transparent" BorderThickness="0"
+                  Foreground="#94a3b8" FontSize="12">
+            <ListView.View>
+                <GridView>
+                    <GridViewColumn Header="#" Width="40" DisplayMemberBinding="{Binding Index}"/>
+                    <GridViewColumn Header="Class" Width="200" DisplayMemberBinding="{Binding ClassName}"/>
+                    <GridViewColumn Header="Method" Width="250" DisplayMemberBinding="{Binding MethodName}"/>
+                    <GridViewColumn Header="Result" Width="80" DisplayMemberBinding="{Binding ResultText}"/>
+                    <GridViewColumn Header="Duration" Width="80" DisplayMemberBinding="{Binding DurationText}"/>
+                    <GridViewColumn Header="Error" Width="200" DisplayMemberBinding="{Binding Error}"/>
+                </GridView>
+            </ListView.View>
+            <ListView.ItemContainerStyle>
+                <Style TargetType="ListViewItem">
+                    <Setter Property="Foreground" Value="#94a3b8"/>
+                    <Style.Triggers>
+                        <DataTrigger Binding="{Binding ResultText}" Value="Pass">
+                            <Setter Property="Foreground" Value="#10b981"/>
+                        </DataTrigger>
+                        <DataTrigger Binding="{Binding ResultText}" Value="Fail">
+                            <Setter Property="Foreground" Value="#ef4444"/>
+                        </DataTrigger>
+                        <DataTrigger Binding="{Binding ResultText}" Value="Skip">
+                            <Setter Property="Foreground" Value="#f59e0b"/>
+                        </DataTrigger>
+                        <DataTrigger Binding="{Binding ResultText}" Value="Running">
+                            <Setter Property="Foreground" Value="#3b82f6"/>
+                        </DataTrigger>
+                    </Style.Triggers>
+                </Style>
+            </ListView.ItemContainerStyle>
+        </ListView>
+
+        <!-- Status Bar -->
+        <Border Grid.Row="2" Background="#0d1117" Padding="8,4" Margin="0,4,0,0">
+            <TextBlock x:Name="SummaryText" Foreground="#64748b" FontSize="12"/>
+        </Border>
+    </Grid>
+</UserControl>

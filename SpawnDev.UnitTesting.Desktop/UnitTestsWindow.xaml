@@ -1,0 +1,9 @@
+<Window x:Class="SpawnDev.UnitTesting.Desktop.UnitTestsWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:local="clr-namespace:SpawnDev.UnitTesting.Desktop"
+        Title="SpawnDev.UnitTesting — Desktop Runner"
+        Width="900" Height="600"
+        Background="#0f172a">
+    <local:UnitTestsControl x:Name="TestControl"/>
+</Window>

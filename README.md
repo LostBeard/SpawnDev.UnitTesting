@@ -5,6 +5,7 @@
 |---------|-------------|------|
 |**SpawnDev.UnitTesting**| Cross-platform unit testing framework | [![NuGet version](https://badge.fury.io/nu/SpawnDev.UnitTesting.svg)](https://www.nuget.org/packages/SpawnDev.UnitTesting) |
 |**SpawnDev.UnitTesting.Blazor**| Blazor UI components for SpawnDev.UnitTesting | [![NuGet version](https://badge.fury.io/nu/SpawnDev.UnitTesting.Blazor.svg)](https://www.nuget.org/packages/SpawnDev.UnitTesting.Blazor) |
+|**SpawnDev.UnitTesting.Desktop**| WPF UI components for SpawnDev.UnitTesting | [![NuGet version](https://badge.fury.io/nu/SpawnDev.UnitTesting.Desktop.svg)](https://www.nuget.org/packages/SpawnDev.UnitTesting.Desktop) |
 
 # SpawnDev.UnitTesting
 [![NuGet](https://img.shields.io/nuget/dt/SpawnDev.UnitTesting.svg?label=SpawnDev.UnitTesting)](https://www.nuget.org/packages/SpawnDev.UnitTesting)
@@ -20,6 +21,7 @@ Supersedes [SpawnDev.Blazor.UnitTesting](https://www.nuget.org/packages/SpawnDev
 - **Async support** — full `async Task` test methods with configurable timeouts
 - **Unsupported tests** — throw `UnsupportedTestException` to skip tests gracefully
 - **Blazor UI** — `SpawnDev.UnitTesting.Blazor` provides `UnitTestsView` Razor component
+- **WPF Desktop UI** — `SpawnDev.UnitTesting.Desktop` provides `UnitTestsControl` and `UnitTestsWindow`
 
 ## Quick Start
 
@@ -66,4 +68,25 @@ await runner.RunTests();
         typeof(MyTests).Assembly
     };
 }
+```
+
+### 4. WPF Desktop UI (SpawnDev.UnitTesting.Desktop)
+
+**Option A — Standalone Window:**
+```csharp
+var testWindow = new SpawnDev.UnitTesting.Desktop.UnitTestsWindow
+{
+    TestTypes = new[] { typeof(MyTests) },
+    AutoRun = true,
+};
+testWindow.Show();
+```
+
+**Option B — Embeddable UserControl:**
+```xml
+<local:UnitTestsControl x:Name="TestControl" />
+```
+```csharp
+TestControl.TestTypes = new[] { typeof(MyTests) };
+TestControl.AutoRun = true;
 ```

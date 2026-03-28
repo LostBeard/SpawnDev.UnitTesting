@@ -1,0 +1,34 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+	<PropertyGroup>
+		<TargetFramework>net10.0-windows</TargetFramework>
+		<LangVersion>latest</LangVersion>
+		<Nullable>enable</Nullable>
+		<ImplicitUsings>enable</ImplicitUsings>
+		<UseWPF>true</UseWPF>
+		<Version>2.4.2</Version>
+		<GeneratePackageOnBuild>True</GeneratePackageOnBuild>
+		<GenerateDocumentationFile>true</GenerateDocumentationFile>
+		<EmbedAllSources>true</EmbedAllSources>
+		<DebugType>Embedded</DebugType>
+		<Title>SpawnDev.UnitTesting.Desktop</Title>
+		<Authors>LostBeard</Authors>
+		<Description>WPF UI components for SpawnDev.UnitTesting. Desktop counterpart to SpawnDev.UnitTesting.Blazor.</Description>
+		<PackageProjectUrl>https://github.com/LostBeard/SpawnDev.UnitTesting</PackageProjectUrl>
+		<PackageReadmeFile>README.md</PackageReadmeFile>
+		<PackageLicenseFile>LICENSE.txt</PackageLicenseFile>
+		<RepositoryUrl>https://github.com/LostBeard/SpawnDev.UnitTesting.git</RepositoryUrl>
+		<RepositoryType>git</RepositoryType>
+		<PackageTags>WPF;DotNet;UnitTesting;Testing;Desktop</PackageTags>
+	</PropertyGroup>
+
+	<ItemGroup>
+		<None Include="..\README.md" Pack="true" PackagePath="\" />
+		<None Include="..\LICENSE.txt" Pack="true" PackagePath="\" />
+	</ItemGroup>
+
+	<ItemGroup>
+		<ProjectReference Include="..\SpawnDev.UnitTesting\SpawnDev.UnitTesting.csproj" />
+	</ItemGroup>
+
+</Project>
