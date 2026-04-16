@@ -118,7 +118,7 @@ namespace SpawnDev.UnitTesting
         /// </summary>
         public void SetTestTypes(IEnumerable<Type> unitTestTypes)
         {
-            if (unitTestTypes.Count() == 0)
+            if (!unitTestTypes.Any())
             {
                 return;
             }
@@ -130,20 +130,56 @@ namespace SpawnDev.UnitTesting
             Tests.Clear();
             foreach (Type unitTestType in UnitTestTypes)
             {
-                var methods = unitTestType.GetMethods(BindingFlags.Public | BindingFlags.Instance)
-                    .Where(o => o.GetParameters().Length == 0)
-                    // When a derived class hides a base method with 'new',
-                    // GetMethods returns both. Group by name and keep only the
-                    // most-derived version (DeclaringType closest to unitTestType).
-                    .GroupBy(m => m.Name)
-                    .Select(g => g.OrderByDescending(m =>
-                        GetTypeDepth(m.DeclaringType!, unitTestType)).First())
-                    .ToList();
-                foreach (var method in methods)
+                // Discover test methods using metadata-only reflection to avoid forcing
+                // the CLR to JIT-compile type signatures for non-test methods.
+                // This prevents .NET 10 JIT crashes when test classes contain methods that
+                // reference heavy generic types (ILGPU kernels, ArrayView<T>, etc.).
+                //
+                // Strategy: use CustomAttributeData (metadata-only, no type loading) to find
+                // method names with [TestMethod], then resolve only those specific methods.
+                var testMethodNames = new HashSet<string>();
+                var testMethodAttrName = typeof(TestMethodAttribute).FullName;
+
+                // Walk the type hierarchy to find all [TestMethod]-decorated methods
+                var currentType = unitTestType;
+                while (currentType != null && currentType != typeof(object))
                 {
-                    var testMethodAttr = method.GetCustomAttribute<TestMethodAttribute>();
-                    if (testMethodAttr == null) continue;
-                    Tests.Add(new UnitTest(unitTestType, method));
+                    foreach (var method in currentType.GetMethods(BindingFlags.Public | BindingFlags.Instance | BindingFlags.DeclaredOnly))
+                    {
+                        try
+                        {
+                            // Use CustomAttributeData for metadata-only check - does NOT
+                            // force resolution of the method's parameter/return types
+                            var hasAttr = CustomAttributeData.GetCustomAttributes(method)
+                                .Any(a => a.AttributeType == typeof(TestMethodAttribute));
+                            if (!hasAttr) continue;
+                            if (method.GetParameters().Length != 0) continue;
+                            // Only add if not already found in a more-derived type
+                            testMethodNames.Add(method.Name);
+                        }
+                        catch
+                        {
+                            // Skip methods that can't be reflected (e.g., broken generic instantiations)
+                        }
+                    }
+                    currentType = currentType.BaseType;
+                }
+
+                // Now resolve only the test methods by name on the concrete type
+                foreach (var methodName in testMethodNames)
+                {
+                    try
+                    {
+                        var method = unitTestType.GetMethod(methodName, BindingFlags.Public | BindingFlags.Instance, null, Type.EmptyTypes, null);
+                        if (method != null)
+                        {
+                            Tests.Add(new UnitTest(unitTestType, method));
+                        }
+                    }
+                    catch
+                    {
+                        // Skip methods that fail to resolve
+                    }
                 }
             }
             State = TestState.None;
@@ -151,15 +187,44 @@ namespace SpawnDev.UnitTesting
         }
 
         /// <summary>
-        /// Discovers test types from the given assemblies (types with [TestMethod] methods)
+        /// Registers test types without performing method discovery.
+        /// Use this when you only need ResolveSingleTest and want to avoid loading
+        /// all method signatures upfront.
+        /// </summary>
+        public void RegisterTestTypes(IEnumerable<Type> types)
+        {
+            UnitTestTypes = types.Distinct().ToList();
+        }
+
+        /// <summary>
+        /// Discovers test types from the given assemblies (types with [TestMethod] methods).
+        /// Uses IsDefined for attribute checks to avoid eager type loading of method signatures
+        /// which can trigger .NET 10 JIT crashes with heavy generic types (e.g., ILGPU kernels).
         /// </summary>
         public void SetTestAssemblies(IEnumerable<Assembly> assemblies)
         {
-            var types = assemblies
-                .SelectMany(a => a.GetTypes())
-                .Where(t => !t.IsAbstract && t.GetMethods(BindingFlags.Public | BindingFlags.Instance)
-                    .Any(m => m.GetCustomAttribute<TestMethodAttribute>() != null))
-                .ToList();
+            var types = new List<Type>();
+            foreach (var assembly in assemblies)
+            {
+                Type[] assemblyTypes;
+                try { assemblyTypes = assembly.GetTypes(); }
+                catch (ReflectionTypeLoadException ex) { assemblyTypes = ex.Types.Where(t => t != null).ToArray()!; }
+                catch { continue; }
+
+                foreach (var type in assemblyTypes)
+                {
+                    if (type.IsAbstract) continue;
+                    try
+                    {
+                        // Use IsDefined for a lightweight attribute check instead of
+                        // GetCustomAttribute which forces full method signature resolution.
+                        var hasTestMethod = type.GetMethods(BindingFlags.Public | BindingFlags.Instance)
+                            .Any(m => m.GetParameters().Length == 0 && m.IsDefined(typeof(TestMethodAttribute), true));
+                        if (hasTestMethod) types.Add(type);
+                    }
+                    catch { }
+                }
+            }
             SetTestTypes(types);
         }
 
@@ -179,6 +244,48 @@ namespace SpawnDev.UnitTesting
                 depth--;
             }
             return depth;
+        }
+
+        /// <summary>
+        /// Resolves a single test by "ClassName.MethodName" without loading all method metadata
+        /// on the type. This avoids forcing the CLR to JIT-compile type signatures for every
+        /// method, which prevents .NET 10 JIT crashes when test classes contain methods that
+        /// reference heavy generic types (ILGPU kernels, ArrayView, etc.).
+        /// </summary>
+        public UnitTest? ResolveSingleTest(string fullTestName)
+        {
+            var parts = fullTestName.Split('.', 2);
+            if (parts.Length != 2) return null;
+            var className = parts[0];
+            var methodName = parts[1];
+
+            // Find the test type by class name from registered types,
+            // or scan loaded assemblies if no types are registered yet
+            Type? testType = UnitTestTypes.FirstOrDefault(t => t.Name == className);
+            if (testType == null)
+            {
+                foreach (var assembly in AppDomain.CurrentDomain.GetAssemblies())
+                {
+                    try
+                    {
+                        testType = assembly.GetTypes().FirstOrDefault(t => !t.IsAbstract && t.Name == className);
+                        if (testType != null) break;
+                    }
+                    catch { }
+                }
+            }
+            if (testType == null) return null;
+
+            // Resolve ONLY the specific method by name - does NOT load all methods
+            var method = testType.GetMethod(methodName, BindingFlags.Public | BindingFlags.Instance, null, Type.EmptyTypes, null);
+            if (method == null) return null;
+
+            // Verify it has [TestMethod]
+            if (!method.IsDefined(typeof(TestMethodAttribute), true)) return null;
+
+            var test = new UnitTest(testType, method);
+            Tests.Add(test);
+            return test;
         }
 
         /// <summary>
