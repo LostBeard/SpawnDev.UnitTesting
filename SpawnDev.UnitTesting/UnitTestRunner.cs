@@ -370,7 +370,10 @@ namespace SpawnDev.UnitTesting
         }
 
         /// <summary>
-        /// Runs a single test
+        /// Runs a single test. If <see cref="TestMethodAttribute.RetryCount"/> is non-zero and
+        /// the test result is <see cref="TestResult.Error"/>, the test is re-invoked up to that
+        /// many additional times. Success and Unsupported outcomes short-circuit the retry loop.
+        /// The final <see cref="UnitTest.Duration"/> is cumulative across all attempts.
         /// </summary>
         public async Task RunTest(UnitTest test)
         {
@@ -379,91 +382,109 @@ namespace SpawnDev.UnitTesting
             test.Reset();
             test.State = TestState.Running;
             FireStateChangeEvent();
-            // Dismiss any pre-existing error UI before the test
-            if (DismissErrorUI != null)
-            {
-                try { await DismissErrorUI(); } catch { }
-            }
-            var sw = new Stopwatch();
-            sw.Start();
-            // Determine timeout: per-test attribute overrides default
+            // Determine timeout + retry count from the test method attribute
             var testMethodAttr = method.GetCustomAttribute<TestMethodAttribute>();
             var timeoutMs = testMethodAttr?.Timeout > 0 ? testMethodAttr.Timeout : DefaultTimeoutMs;
-            try
+            var maxAttempts = Math.Max(1, (testMethodAttr?.RetryCount ?? 0) + 1);
+            var sw = new Stopwatch();
+            sw.Start();
+            for (int attempt = 1; attempt <= maxAttempts; attempt++)
             {
-                var ret = method.Invoke(testInstance, null);
-                if (ret is Task task)
+                // Fresh per-attempt state so a passing retry doesn't leak the prior attempt's error
+                test.Error = "";
+                test.ResultText = "";
+                test.StackTrace = "";
+                test.Result = TestResult.None;
+                // Dismiss any pre-existing error UI before the attempt
+                if (DismissErrorUI != null)
                 {
-                    if (timeoutMs > 0)
+                    try { await DismissErrorUI(); } catch { }
+                }
+                try
+                {
+                    var ret = method!.Invoke(testInstance, null);
+                    if (ret is Task task)
                     {
-                        var timeoutTask = Task.Delay(timeoutMs);
-                        var completed = await Task.WhenAny(task, timeoutTask);
-                        if (completed == timeoutTask)
+                        if (timeoutMs > 0)
                         {
-                            throw new TimeoutException($"Test exceeded timeout of {timeoutMs}ms");
-                        }
-                        await task;
-                    }
-                    else
-                    {
-                        await task;
-                    }
-                    // If the task has a result, try to get it
-                    if (ret.GetType().IsGenericType)
-                    {
-                        var resultProp = ret.GetType().GetProperty("Result");
-                        if (resultProp != null)
-                        {
-                            var resultVal = resultProp.GetValue(ret);
-                            if (resultVal is string retStr && !string.IsNullOrEmpty(retStr))
+                            var timeoutTask = Task.Delay(timeoutMs);
+                            var completed = await Task.WhenAny(task, timeoutTask);
+                            if (completed == timeoutTask)
                             {
-                                test.ResultText = retStr;
+                                throw new TimeoutException($"Test exceeded timeout of {timeoutMs}ms");
+                            }
+                            await task;
+                        }
+                        else
+                        {
+                            await task;
+                        }
+                        // If the task has a result, try to get it
+                        if (ret.GetType().IsGenericType)
+                        {
+                            var resultProp = ret.GetType().GetProperty("Result");
+                            if (resultProp != null)
+                            {
+                                var resultVal = resultProp.GetValue(ret);
+                                if (resultVal is string retStr && !string.IsNullOrEmpty(retStr))
+                                {
+                                    test.ResultText = retStr;
+                                }
                             }
                         }
                     }
-                }
-                else if (ret is string retStr && !string.IsNullOrEmpty(retStr))
-                {
-                    test.ResultText = retStr;
-                }
-                test.Result = TestResult.Success;
-            }
-            catch (UnsupportedTestException ex)
-            {
-                test.StackTrace = "";
-                test.ResultText = ex.Message ?? "";
-                test.Result = TestResult.Unsupported;
-            }
-            catch (TargetInvocationException ex) when (ex.InnerException is UnsupportedTestException unsupported)
-            {
-                test.StackTrace = "";
-                test.ResultText = unsupported.Message ?? "";
-                test.Result = TestResult.Unsupported;
-            }
-            catch (TimeoutException ex)
-            {
-                test.StackTrace = "";
-                test.Error = ex.Message;
-                test.Result = TestResult.Error;
-            }
-            catch (Exception ex)
-            {
-                test.StackTrace = ex.StackTrace ?? "";
-                test.Error = ex.InnerException != null ? ex.InnerException.ToString() : ex.ToString();
-                test.Result = TestResult.Error;
-            }
-            // Check if framework error UI appeared during the test
-            if (test.Result == TestResult.Success && CheckErrorUI != null)
-            {
-                try
-                {
-                    if (await CheckErrorUI())
+                    else if (ret is string retStr && !string.IsNullOrEmpty(retStr))
                     {
-                        test.Result = TestResult.Error;
-                        test.Error = "Framework error UI appeared during test execution";
+                        test.ResultText = retStr;
                     }
+                    test.Result = TestResult.Success;
                 }
-                catch { }
+                catch (UnsupportedTestException ex)
+                {
+                    test.StackTrace = "";
+                    test.ResultText = ex.Message ?? "";
+                    test.Result = TestResult.Unsupported;
+                }
+                catch (TargetInvocationException ex) when (ex.InnerException is UnsupportedTestException unsupported)
+                {
+                    test.StackTrace = "";
+                    test.ResultText = unsupported.Message ?? "";
+                    test.Result = TestResult.Unsupported;
+                }
+                catch (TimeoutException ex)
+                {
+                    test.StackTrace = "";
+                    test.Error = ex.Message;
+                    test.Result = TestResult.Error;
+                }
+                catch (Exception ex)
+                {
+                    test.StackTrace = ex.StackTrace ?? "";
+                    test.Error = ex.InnerException != null ? ex.InnerException.ToString() : ex.ToString();
+                    test.Result = TestResult.Error;
+                }
+                // Check if framework error UI appeared during the test (only on otherwise-success path)
+                if (test.Result == TestResult.Success && CheckErrorUI != null)
+                {
+                    try
+                    {
+                        if (await CheckErrorUI())
+                        {
+                            test.Result = TestResult.Error;
+                            test.Error = "Framework error UI appeared during test execution";
+                        }
+                    }
+                    catch { }
+                }
+                // Stop retrying once we have a non-error outcome (Success or Unsupported)
+                if (test.Result != TestResult.Error)
+                {
+                    test.AttemptsConsumed = attempt - 1;
+                    break;
+                }
+                // Error and more attempts remain — loop
+                if (attempt < maxAttempts) continue;
+                test.AttemptsConsumed = attempt - 1;
             }
             if (string.IsNullOrEmpty(test.ResultText)) test.ResultText = test.Result.ToString();
             test.State = TestState.Done;

@@ -60,6 +60,17 @@ namespace SpawnDev.UnitTesting
         /// </summary>
         public string StackTrace { get; set; } = "";
         /// <summary>
+        /// Number of retries consumed before the final result was recorded. Populated by
+        /// <see cref="UnitTestRunner.RunTest"/> when <see cref="TestMethodAttribute.RetryCount"/>
+        /// is non-zero. 0 means the test passed (or was skipped) on its first attempt.
+        /// </summary>
+        public int AttemptsConsumed { get; set; }
+        /// <summary>
+        /// Category tag propagated from <see cref="TestMethodAttribute.Category"/>. Empty
+        /// when no category was specified.
+        /// </summary>
+        public string Category { get; set; } = "";
+        /// <summary>
         /// Creates a new UnitTest
         /// </summary>
         public UnitTest(Type testClass, MethodInfo methodInfo)
@@ -68,6 +79,8 @@ namespace SpawnDev.UnitTesting
             TestTypeName = TestType.Name;
             TestMethod = methodInfo;
             TestMethodName = TestMethod.Name;
+            var attr = methodInfo.GetCustomAttribute<TestMethodAttribute>();
+            if (attr != null) Category = attr.Category ?? "";
         }
         public UnitTest() { }
         /// <summary>
@@ -81,6 +94,7 @@ namespace SpawnDev.UnitTesting
             Duration = 0;
             State = TestState.None;
             StackTrace = "";
+            AttemptsConsumed = 0;
         }
         /// <summary>
         /// Returns ClassType.MethodName
