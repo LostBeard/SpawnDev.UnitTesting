@@ -150,7 +150,34 @@ runner.DefaultTimeoutMs = 60000; // 1 minute
 runner.DefaultTimeoutMs = 0;     // disable timeout
 ```
 
-### 7. Test Result Text
+### 7. Retry on Failure (v2.5.2+)
+
+For tests whose failure mode is genuine external-infrastructure flake (network hops, signaling servers, STUN/TURN, DNS), set `RetryCount` on the attribute. The test re-runs up to N times on `Error`; `Success` and `Unsupported` short-circuit the loop.
+
+```csharp
+[TestMethod(Timeout = 180000, RetryCount = 3)]
+public async Task SignalingPathTest() { /* ... */ }
+```
+
+Per-attempt state (`Error`, `ResultText`, `StackTrace`) is reset between tries so a passing retry doesn't carry over the prior attempt's error. `UnitTest.AttemptsConsumed` is populated so you can see "passed on attempt 2 of 4" in the results. Duration is cumulative across all attempts.
+
+**Don't use this to mask library races.** If a test fails because of a genuine concurrency bug, fix the bug. `RetryCount` is for infrastructure hiccups outside your code's control.
+
+### 8. Test Categories (v2.5.2+)
+
+Tag tests with a `Category` string for grouping or filtering. Common uses: opt-in stress tests, smoke suites, integration-only subsets.
+
+```csharp
+[TestMethod(Category = "Stress")]
+public async Task HundredMBTensorTransfer() { /* ... */ }
+
+[TestMethod(Category = "Smoke")]
+public async Task CriticalPathTest() { /* ... */ }
+```
+
+The category flows through to `UnitTest.Category` for downstream filtering; the runner itself does not pre-filter by category - consuming harnesses decide which categories to include/exclude at run time.
+
+### 9. Test Result Text
 
 Tests can return a string for additional result information:
 
@@ -163,7 +190,7 @@ public async Task<string> InfoTest()
 }
 ```
 
-### 8. Blazor UI (SpawnDev.UnitTesting.Blazor)
+### 10. Blazor UI (SpawnDev.UnitTesting.Blazor)
 
 ```razor
 @using SpawnDev.UnitTesting.Blazor
@@ -179,7 +206,7 @@ public async Task<string> InfoTest()
 
 Supports live `latest.json` result output via `ResultsDirectory` (OPFS `FileSystemDirectoryHandle` in browser).
 
-### 9. WPF Desktop UI (SpawnDev.UnitTesting.Desktop)
+### 11. WPF Desktop UI (SpawnDev.UnitTesting.Desktop)
 
 **Option A - Standalone Window:**
 ```csharp
@@ -242,8 +269,16 @@ TestControl.AutoRun = true;
 | `Error` | `string` | Error message if failed |
 | `StackTrace` | `string` | Stack trace if failed |
 | `ResultText` | `string` | Success message or skip reason |
+| `AttemptsConsumed` | `int` | Retries used before final result (0 = passed on first attempt) |
+| `Category` | `string` | Category tag from `TestMethodAttribute.Category` (empty when unset) |
 
 ## Changelog
+
+### v2.5.2
+- **Added `TestMethodAttribute.RetryCount`** - retry the test up to N times on `TestResult.Error`. `Success` and `Unsupported` short-circuit the loop. Per-attempt state (`Error`, `ResultText`, `StackTrace`) is reset between tries; cumulative `Duration` across all attempts.
+- **Added `TestMethodAttribute.Category`** - string tag for grouping/filtering tests (e.g. `"Stress"`, `"Smoke"`). Propagated to `UnitTest.Category` for downstream filtering by consuming harnesses.
+- **Added `UnitTest.AttemptsConsumed`** - populated by `UnitTestRunner.RunTest` so results can report "passed on attempt 2 of 4".
+- **Added `UnitTest.Category`** - mirrors the attribute value for easy access without re-reflecting.
 
 ### v2.5.1
 - **Fixed .NET 10 JIT crash** - eager method reflection via `GetMethods()` forced the CLR to compile type metadata for all method signatures at process startup, causing intermittent `Internal CLR error (0x80131506)` when test classes referenced heavy generic types (ILGPU kernels, etc.)
