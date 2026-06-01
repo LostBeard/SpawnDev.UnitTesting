@@ -77,7 +77,7 @@
                         _ => "",
                     };
                     var testClassName = $"{test.TestTypeName}-{test.TestMethodName}";
-                    <tr style="padding: 2px;" class="@stateClass @resultClass @testClassName">
+                    <tr style="padding: 2px;" class="@stateClass @resultClass @testClassName" data-test-category="@test.Category">
                         <td>
                             <button onclick="@(() => unitTestService.RunTest(test))" disabled="@(unitTestService.State == TestState.Running || test.State == TestState.Running)">Run</button>
                         </td>

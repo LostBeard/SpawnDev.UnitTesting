@@ -11,9 +11,17 @@ namespace SpawnDev.UnitTesting
             // default return list of tests
             if (args.Length == 0)
             {
+                // PMT_EMIT_CATEGORY=1 opts the enumeration into appending the test's
+                // Category as "Type.Method|Category". Gated behind the env var so older
+                // PlaywrightMultiTest hosts (which split each line on '.' expecting bare
+                // "Type.Method") keep seeing the original format and don't break.
+                var emitCategory = Environment.GetEnvironmentVariable("PMT_EMIT_CATEGORY") == "1";
                 foreach(var test in runner.Tests)
                 {
-                    Console.WriteLine($"{test.TestTypeName}.{test.TestMethodName}");
+                    if (emitCategory)
+                        Console.WriteLine($"{test.TestTypeName}.{test.TestMethodName}|{test.Category}");
+                    else
+                        Console.WriteLine($"{test.TestTypeName}.{test.TestMethodName}");
                 }
                 return 0;
             }
