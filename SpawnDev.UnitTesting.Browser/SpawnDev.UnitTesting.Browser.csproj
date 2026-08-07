@@ -4,20 +4,20 @@
 		<TargetFrameworks>net8.0;net9.0;net10.0</TargetFrameworks>
 		<Nullable>enable</Nullable>
 		<ImplicitUsings>enable</ImplicitUsings>
-		<Version>2.5.7</Version>
+		<Version>2.5.8</Version>
 		<GeneratePackageOnBuild>True</GeneratePackageOnBuild>
 		<GenerateDocumentationFile>true</GenerateDocumentationFile>
 		<EmbedAllSources>true</EmbedAllSources>
 		<DebugType>Embedded</DebugType>
-		<Title>SpawnDev.UnitTesting.Blazor</Title>
+		<Title>SpawnDev.UnitTesting.Browser</Title>
 		<Authors>LostBeard</Authors>
-		<Description>Blazor UI components for SpawnDev.UnitTesting using BlazorJS</Description>
+		<Description>Browser UI components for SpawnDev.UnitTesting using SpawnJS</Description>
 		<PackageProjectUrl>https://github.com/LostBeard/SpawnDev.UnitTesting</PackageProjectUrl>
 		<PackageReadmeFile>README.md</PackageReadmeFile>
 		<PackageLicenseFile>LICENSE.txt</PackageLicenseFile>
 		<RepositoryUrl>https://github.com/LostBeard/SpawnDev.UnitTesting.git</RepositoryUrl>
 		<RepositoryType>git</RepositoryType>
-		<PackageTags>Blazor;DotNet;UnitTesting;Testing</PackageTags>
+		<PackageTags>Browser;SpawnJS;DotNet;UnitTesting;Testing</PackageTags>
 		<LangVersion>latest</LangVersion>
 	</PropertyGroup>
 
@@ -25,10 +25,22 @@
 		<None Include="..\README.md" Pack="true" PackagePath="\" />
 		<None Include="..\LICENSE.txt" Pack="true" PackagePath="\" />
 	</ItemGroup>
-	
+
 	<ItemGroup>
-		<PackageReference Include="SpawnDev.BlazorJS" Version="3.5.26" />
+		<PackageReference Include="SpawnDev.SpawnJS" Version="1.1.8" />
 		<ProjectReference Include="..\SpawnDev.UnitTesting\SpawnDev.UnitTesting.csproj" />
+	</ItemGroup>
+
+	<ItemGroup Condition=" '$(TargetFramework)' == 'net8.0' ">
+		<PackageReference Include="Microsoft.AspNetCore.Components.WebAssembly" Version="8.0.19" />
+	</ItemGroup>
+
+	<ItemGroup Condition=" '$(TargetFramework)' == 'net9.0' ">
+		<PackageReference Include="Microsoft.AspNetCore.Components.WebAssembly" Version="9.0.8" />
+	</ItemGroup>
+
+	<ItemGroup Condition=" '$(TargetFramework)' == 'net10.0' ">
+		<PackageReference Include="Microsoft.AspNetCore.Components.WebAssembly" Version="10.0.0" />
 	</ItemGroup>
 
 	<ItemGroup>

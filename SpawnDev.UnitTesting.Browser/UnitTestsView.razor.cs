@@ -1,11 +1,15 @@
 using Microsoft.AspNetCore.Components;
+using Microsoft.AspNetCore.Components.Web;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.JSInterop;
-using SpawnDev.BlazorJS;
-using SpawnDev.BlazorJS.JSObjects;
+using SpawnDev.SpawnJS;
+using SpawnDev.SpawnJS.JSObjects;
 using System.Reflection;
 using System.Text.Json;
 
-namespace SpawnDev.UnitTesting.Blazor
+namespace SpawnDev.UnitTesting.Browser
 {
     /// <summary>
     /// Blazor component that displays and runs unit tests.
@@ -59,7 +63,7 @@ namespace SpawnDev.UnitTesting.Blazor
         IServiceProvider ServiceProvider { get; set; } = default!;
 
         [Inject]
-        BlazorJSRuntime JS { get; set; } = default!;
+        SpawnJSRuntime JS { get; set; } = default!;
 
         bool _beenInit = false;
 
