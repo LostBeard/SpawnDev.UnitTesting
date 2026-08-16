@@ -120,7 +120,7 @@ namespace SpawnDev.UnitTesting.Browser
         /// </summary>
         private async Task<bool> DismissBlazorErrorUI()
         {
-            return JS.Call<bool>(
+            return JS.Call<string, bool>(
                 "eval",
                 "(() => { var el = document.getElementById('blazor-error-ui'); if (el && getComputedStyle(el).display !== 'none') { el.style.display = 'none'; return true; } return false; })()");
         }
@@ -130,7 +130,7 @@ namespace SpawnDev.UnitTesting.Browser
         /// </summary>
         private async Task<bool> IsBlazorErrorUIVisible()
         {
-            return JS.Call<bool>(
+            return JS.Call<string, bool>(
                 "eval",
                 "(() => { var el = document.getElementById('blazor-error-ui'); return el != null && getComputedStyle(el).display !== 'none'; })()");
         }
