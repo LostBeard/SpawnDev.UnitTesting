@@ -4,7 +4,7 @@
 		<TargetFrameworks>net10.0</TargetFrameworks>
 		<Nullable>enable</Nullable>
 		<ImplicitUsings>enable</ImplicitUsings>
-		<Version>2.6.1</Version>
+		<Version>2.7.0</Version>
 		<GeneratePackageOnBuild>True</GeneratePackageOnBuild>
 		<GenerateDocumentationFile>true</GenerateDocumentationFile>
 		<EmbedAllSources>true</EmbedAllSources>
@@ -28,7 +28,7 @@
 
 	<ItemGroup>
 		<PackageReference Include="Microsoft.AspNetCore.Components.WebAssembly" Version="10.0.0" />
-		<PackageReference Include="SpawnDev.SpawnJS" Version="2.0.15" />
+		<PackageReference Include="SpawnDev.SpawnJS" Version="2.1.0" />
 		<ProjectReference Include="..\SpawnDev.UnitTesting\SpawnDev.UnitTesting.csproj" />
 	</ItemGroup>
 
