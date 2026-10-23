@@ -104,6 +104,12 @@ namespace SpawnDev.UnitTesting
         /// Can also be set per-test via TestMethodAttribute.Timeout.
         /// </summary>
         public int DefaultTimeoutMs { get; set; } = 30000;
+
+        /// <summary>
+        /// After a test times out, how long the runner keeps waiting for it to finish before moving on (a timed-out test is
+        /// not cancelled, so the next test would otherwise overlap it). Default 10 minutes; never less than the test's timeout.
+        /// </summary>
+        public int AbandonedTestGraceMs { get; set; } = 600_000;
         /// <summary>
         /// All discovered tests
         /// </summary>
@@ -411,7 +417,15 @@ namespace SpawnDev.UnitTesting
                             var completed = await Task.WhenAny(task, timeoutTask);
                             if (completed == timeoutTask)
                             {
-                                throw new TimeoutException($"Test exceeded timeout of {timeoutMs}ms");
+                                // A timed-out test is NOT cancelled: its async work keeps running - in a browser on the same
+                                // page and the same GPU device. Starting the next test now made the two overlap (GPU suites
+                                // then died with DEVICE_HUNG in an innocent test). Wait for it, bounded, before reporting.
+                                var graceMs = Math.Max(timeoutMs, AbandonedTestGraceMs);
+                                bool finished = await Task.WhenAny(task, Task.Delay(graceMs)) == task;
+                                if (finished) _ = task.Exception;   // observe it; the timeout is what gets reported
+                                throw new TimeoutException(finished
+                                    ? $"Test exceeded timeout of {timeoutMs}ms (it finished after {sw.ElapsedMilliseconds}ms; the next test waited for it)"
+                                    : $"Test exceeded timeout of {timeoutMs}ms (still running {graceMs}ms later; later tests may overlap it)");
                             }
                             await task;
                         }
