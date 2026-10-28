@@ -145,6 +145,7 @@ namespace SpawnDev.UnitTesting
                 // method names with [TestMethod], then resolve only those specific methods.
                 var testMethodNames = new HashSet<string>();
                 var testMethodAttrName = typeof(TestMethodAttribute).FullName;
+                var excludedCategories = ExcludedCategories(unitTestType);
 
                 // Walk the type hierarchy to find all [TestMethod]-decorated methods
                 var currentType = unitTestType;
@@ -156,9 +157,10 @@ namespace SpawnDev.UnitTesting
                         {
                             // Use CustomAttributeData for metadata-only check - does NOT
                             // force resolution of the method's parameter/return types
-                            var hasAttr = CustomAttributeData.GetCustomAttributes(method)
-                                .Any(a => a.AttributeType == typeof(TestMethodAttribute));
-                            if (!hasAttr) continue;
+                            var attrData = CustomAttributeData.GetCustomAttributes(method)
+                                .FirstOrDefault(a => a.AttributeType == typeof(TestMethodAttribute));
+                            if (attrData == null) continue;
+                            if (excludedCategories != null && excludedCategories.Contains(CategoryOf(attrData))) continue;
                             if (method.GetParameters().Length != 0) continue;
                             // Only add if not already found in a more-derived type
                             testMethodNames.Add(method.Name);
@@ -190,6 +192,26 @@ namespace SpawnDev.UnitTesting
             }
             State = TestState.None;
             FireStateChangeEvent();
+        }
+
+        /// <summary>
+        /// The categories <see cref="ExcludeCategoriesAttribute"/> on <paramref name="type"/> (or a base class) leaves out
+        /// of discovery, or null when there are none.
+        /// </summary>
+        static HashSet<string>? ExcludedCategories(Type type)
+        {
+            var attr = type.GetCustomAttribute<ExcludeCategoriesAttribute>(true);
+            if (attr == null || attr.Categories.Length == 0) return null;
+            return new HashSet<string>(attr.Categories, StringComparer.OrdinalIgnoreCase);
+        }
+
+        /// <summary>The Category named argument of a [TestMethod] attribute's metadata ("" when not set).</summary>
+        static string CategoryOf(CustomAttributeData testMethodAttr)
+        {
+            foreach (var arg in testMethodAttr.NamedArguments)
+                if (arg.MemberName == nameof(TestMethodAttribute.Category))
+                    return arg.TypedValue.Value as string ?? "";
+            return "";
         }
 
         /// <summary>

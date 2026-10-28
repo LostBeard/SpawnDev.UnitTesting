@@ -175,7 +175,24 @@ public async Task HundredMBTensorTransfer() { /* ... */ }
 public async Task CriticalPathTest() { /* ... */ }
 ```
 
-The category flows through to `UnitTest.Category` for downstream filtering; the runner itself does not pre-filter by category - consuming harnesses decide which categories to include/exclude at run time.
+The category flows through to `UnitTest.Category` for downstream filtering; consuming harnesses decide which categories to include/exclude at run time.
+
+**Excluding a category per class (v2.5.8+).** When a whole category cannot apply to a test class (e.g. CPU-only tests on a GPU backend's class, where every one would only skip), declare it on the class and discovery leaves those tests out: they are never listed, scheduled or run for that class, so they cost nothing (a run-time skip still costs one test launch each).
+
+```csharp
+public abstract class CodecTestsBase
+{
+    [TestMethod(Category = "CpuOnly")]
+    public async Task BitReaderTest() { /* managed code only */ }
+}
+
+public class CpuTests : CodecTestsBase { }            // lists BitReaderTest
+
+[ExcludeCategories("CpuOnly")]
+public class CudaTests : CodecTestsBase { }           // does not list it
+```
+
+Matching is case-insensitive; the most-derived `[ExcludeCategories]` wins. Discovery reads the category from metadata only (no method type loading). `ResolveSingleTest` still resolves an excluded test when asked for it by name.
 
 ### 9. Test Result Text
 
@@ -273,6 +290,9 @@ TestControl.AutoRun = true;
 | `Category` | `string` | Category tag from `TestMethodAttribute.Category` (empty when unset) |
 
 ## Changelog
+
+### v2.5.8
+- **Added `ExcludeCategoriesAttribute`** - a test class declares categories that discovery leaves out for that class (never listed or run), instead of each test skipping at run time. First user: SpawnDev.Codecs (2154 CPU-only tests no longer scheduled on six backend lanes).
 
 ### v2.5.2
 - **Added `TestMethodAttribute.RetryCount`** - retry the test up to N times on `TestResult.Error`. `Success` and `Unsupported` short-circuit the loop. Per-attempt state (`Error`, `ResultText`, `StackTrace`) is reset between tries; cumulative `Duration` across all attempts.
