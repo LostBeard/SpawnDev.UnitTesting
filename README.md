@@ -192,7 +192,7 @@ public class CpuTests : CodecTestsBase { }            // lists BitReaderTest
 public class CudaTests : CodecTestsBase { }           // does not list it
 ```
 
-Matching is case-insensitive; the most-derived `[ExcludeCategories]` wins. Discovery reads the category from metadata only (no method type loading). `ResolveSingleTest` still resolves an excluded test when asked for it by name.
+A test may carry several categories, separated by commas (`[TestMethod(Category = "BrowserOnly,NotOnWebGL")]`); it is left out when any of them is excluded. Matching is case-insensitive; the most-derived `[ExcludeCategories]` wins. Discovery reads the category from metadata only (no method type loading). `ResolveSingleTest` still resolves an excluded test when asked for it by name.
 
 ### 9. Test Result Text
 

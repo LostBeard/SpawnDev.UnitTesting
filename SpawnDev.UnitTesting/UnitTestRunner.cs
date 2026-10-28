@@ -160,7 +160,7 @@ namespace SpawnDev.UnitTesting
                             var attrData = CustomAttributeData.GetCustomAttributes(method)
                                 .FirstOrDefault(a => a.AttributeType == typeof(TestMethodAttribute));
                             if (attrData == null) continue;
-                            if (excludedCategories != null && excludedCategories.Contains(CategoryOf(attrData))) continue;
+                            if (excludedCategories != null && IsExcluded(CategoryOf(attrData), excludedCategories)) continue;
                             if (method.GetParameters().Length != 0) continue;
                             // Only add if not already found in a more-derived type
                             testMethodNames.Add(method.Name);
@@ -203,6 +203,20 @@ namespace SpawnDev.UnitTesting
             var attr = type.GetCustomAttribute<ExcludeCategoriesAttribute>(true);
             if (attr == null || attr.Categories.Length == 0) return null;
             return new HashSet<string>(attr.Categories, StringComparer.OrdinalIgnoreCase);
+        }
+
+        /// <summary>
+        /// True when any of the test's categories (a Category may list several, separated by commas) is excluded.
+        /// </summary>
+        static bool IsExcluded(string category, HashSet<string> excluded)
+        {
+            if (string.IsNullOrEmpty(category)) return false;
+            foreach (var part in category.Split(','))
+            {
+                var c = part.Trim();
+                if (c.Length > 0 && excluded.Contains(c)) return true;
+            }
+            return false;
         }
 
         /// <summary>The Category named argument of a [TestMethod] attribute's metadata ("" when not set).</summary>
