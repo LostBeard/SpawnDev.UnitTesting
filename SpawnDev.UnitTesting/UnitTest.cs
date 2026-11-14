@@ -71,6 +71,12 @@ namespace SpawnDev.UnitTesting
         /// </summary>
         public string Category { get; set; } = "";
         /// <summary>
+        /// The test's own time limit in milliseconds, from <see cref="TestMethodAttribute.Timeout"/>; 0 = the runner's
+        /// DefaultTimeoutMs. Shown on the browser test row (data-test-timeout) so an outside driver (PlaywrightMultiTest)
+        /// waits at least as long as the page itself does before it calls a test hung.
+        /// </summary>
+        public int TimeoutMs { get; set; }
+        /// <summary>
         /// Creates a new UnitTest
         /// </summary>
         public UnitTest(Type testClass, MethodInfo methodInfo)
@@ -80,7 +86,11 @@ namespace SpawnDev.UnitTesting
             TestMethod = methodInfo;
             TestMethodName = TestMethod.Name;
             var attr = methodInfo.GetCustomAttribute<TestMethodAttribute>();
-            if (attr != null) Category = attr.Category ?? "";
+            if (attr != null)
+            {
+                Category = attr.Category ?? "";
+                TimeoutMs = attr.Timeout;
+            }
         }
         public UnitTest() { }
         /// <summary>
